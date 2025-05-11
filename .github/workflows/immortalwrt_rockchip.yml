@@ -74,9 +74,6 @@ jobs:
         chmod +x $OPENWRT_NAME/*.sh && cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: SSH connection to Actions
-      uses: csexton/debugger-action@master
-
     - name: Download the installation package
       id: package
       run: |
