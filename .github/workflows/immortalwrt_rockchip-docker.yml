@@ -22,8 +22,6 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Setup Debug Session
-      uses: csexton/debugger-action@master
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
