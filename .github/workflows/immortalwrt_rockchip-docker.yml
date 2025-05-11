@@ -75,9 +75,6 @@ jobs:
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
         chmod +x $OPENWRT_NAME/*.sh && cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        
-    - name: Setup Debug Session
-      uses: csexton/debugger-action@master
       
     - name: Download the installation package
       id: package
