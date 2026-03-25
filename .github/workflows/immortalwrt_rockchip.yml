@@ -1,6 +1,8 @@
 name: immortalwrt_rockchip
 
 on:
+  schedule:
+    - cron: 0 16 * * *
   workflow_dispatch:
 
 env:
