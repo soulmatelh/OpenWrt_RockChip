@@ -20,69 +20,62 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout Project
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 1
 
-    # 核心优化：最大化清理磁盘空间，腾出约 30GB+ 空间
-    - name: Maximize Build Space
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 5120
-        swap-size-mb: 1024
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
+    - name: Cleanup Disk Space (Directly Fix No Space Error)
+      run: |
+        echo "清理前磁盘状态："
+        df -h
+        # 强制删除占地巨大的预装软件库 (Android, .NET, Haskell, CodeQL, Boost)
+        sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+        # 清理 Docker 镜像和 APT 缓存
+        sudo docker image prune --all --force
+        sudo apt-get clean
+        echo "清理后磁盘状态："
+        df -h
 
-    - name: Initialize Environment
+    - name: Initialize Compilation Environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update
         sudo -E apt-get -qq install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-        # 预创建目录防止权限问题
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
+        mkdir -p $GITHUB_WORKSPACE/openwrt
 
-    - name: Download Source Code
-      working-directory: /workdir
+    - name: Clone Source Code
       run: |
-        df -h
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Load Custom Feeds & Scripts
+    - name: Update & Install Feeds
       run: |
-        chmod +x $OPENWRT_NAME/*.sh
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
+        chmod +x $GITHUB_WORKSPACE/$DIY_P1_SH
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: Load Config & DIY2
+    - name: Load Custom Configuration
       run: |
         [ -e "$CONFIG_FILE" ] && cp "$CONFIG_FILE" openwrt/.config
+        chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        # 自动补全配置并下载依赖包
         make defconfig
         make download -j$(nproc)
-        find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile Firmware
+    - name: Compile the Firmware
       id: compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        # 第一次尝试多线程编译，失败则切换单线程 V=s
+        # 多线程失败后自动尝试单线程编译并输出详细日志
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
@@ -93,32 +86,34 @@ jobs:
       if: steps.compile.outputs.status == 'success' && !cancelled()
       run: |
         cd openwrt/bin/targets/*/*
+        # 删除不必要的构建日志和中间产物，仅保留固件
         rm -rf packages *.buildinfo *.manifest *.json
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload Artifact
+    - name: Upload Firmware to Artifact
       uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_NAME1 }}
         path: ${{ env.FIRMWARE }}
 
-    - name: Generate Release Tags
+    - name: Generate Release Tag
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && steps.organize.outputs.status == 'success' && !cancelled()
       run: |
         echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME1 }}" >> $GITHUB_OUTPUT
-        echo "📥 固件下载地址" >> release.txt
+        touch release.txt
+        echo "📥 ImmortalWrt Rockchip 固件下载" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Publish to Release
+    - name: Publish to GitHub Release
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: ${{ env.FIRMWARE }}/*
-        name: ${{ env.date2 }} - Rockchip
+        name: ${{ env.date2 }} - ${{ env.OPENWRT_NAME1 }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
