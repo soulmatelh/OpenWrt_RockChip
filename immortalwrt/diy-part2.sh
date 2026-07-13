@@ -28,4 +28,5 @@ EOF
 # 4. 确保脚本有执行权限
 chmod +x package/base-files/files/etc/uci-defaults/99-custom-settings
 
-sed -i '/PKG_HASH:=/d' feeds/packages/lang/golang/golang/Makefile
+# 修正 Golang 错误的空哈希校验，填入真正的 SHA256 哈希值
+sed -i 's/PKG_HASH:=.*/PKG_HASH:=f90dcee4bd023fa376374ea0a5a6ebe553537b39c426ffd8c689469b45519932/g' feeds/packages/lang/golang/golang/Makefile
