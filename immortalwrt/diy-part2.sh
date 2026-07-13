@@ -27,3 +27,5 @@ EOF
 
 # 4. 确保脚本有执行权限
 chmod +x package/base-files/files/etc/uci-defaults/99-custom-settings
+
+sed -i '/PKG_HASH:=/d' feeds/packages/lang/golang/golang/Makefile
