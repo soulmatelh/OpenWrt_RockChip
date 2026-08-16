@@ -29,4 +29,4 @@ EOF
 chmod +x package/base-files/files/etc/uci-defaults/99-custom-settings
 
 # 修正 Golang 错误的空哈希校验，填入真正的 SHA256 哈希值
-sed -i 's/PKG_HASH:=.*/PKG_HASH:=f90dcee4bd023fa376374ea0a5a6ebe553537b39c426ffd8c689469b45519932/g' feeds/packages/lang/golang/golang/Makefile
+#sed -i 's/PKG_HASH:=.*/PKG_HASH:=1d7e2f70b1ee9b93c7df8efcca71f5adcc6a59797a4336c2d10171bd4c174614/g' feeds/packages/lang/golang/golang/Makefile
