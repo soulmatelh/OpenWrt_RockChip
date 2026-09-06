@@ -1,0 +1,18 @@
+name: Cleanup Old Releases
+
+on:
+  workflow_dispatch: # 支持手动触发
+  schedule:
+    - cron: '0 0 1 * *' # 每月 1 号自动运行
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Old Releases
+        uses: dev-drprasad/delete-older-releases@v0.3.3
+        with:
+          keep_latest: 10            # 保留最新的 3 个 Release
+          delete_tags: true          # 同时删除关联的 Tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
